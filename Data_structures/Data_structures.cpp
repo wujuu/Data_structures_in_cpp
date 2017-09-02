@@ -8,7 +8,7 @@
 #include <cmath>
 #include <climits>
 using namespace std;
-const int N = 20, K = 10;
+const int N = 50, K = 50;
 
 void Swap(int* A, int i, int j) {
 	int tmp = A[i];
@@ -18,12 +18,12 @@ void Swap(int* A, int i, int j) {
 
 //Heaps
 struct heap {
-	int* A, heapsize, lenght;
+	int* A, heapsize, n;
 };
-heap Init_heap(int lenght) {
+heap Init_heap(int n) {
 	heap H;
-	H.A = new int[lenght];
-	H.lenght = lenght;
+	H.A = new int[n];
+	H.n = n;
 	H.heapsize = 0;
 	return H;
 }
@@ -52,10 +52,15 @@ void Incr_key(heap H, int i, int key) {
 		i = Parent(i);
 	}
 }
-void Push(heap H, int key) {
-	H.heapsize++;
-	H.A[H.heapsize] = INT_MIN;
-	Incr_key(H, H.heapsize, key);
+bool Push(heap H, int key) {
+	if (H.heapsize + 1 < H.n) {
+		H.heapsize++;
+		H.A[H.heapsize] = INT_MIN;
+		Incr_key(H, H.heapsize, key);
+		return true;
+	}
+
+	return false;
 }
 int Pop(heap H) {
 	if (H.heapsize > 0) {
@@ -68,84 +73,83 @@ int Pop(heap H) {
 }
 
 //Hash tables
-struct field {
-	int key=-1;
-	bool free = true;
-	bool deleted=false;
+struct Hash_field {
+	int key;
+	int state; // 0 - free, 1 - taken, 2 - complicated
 };
-struct Hash_table {
-	field* H;
-	int n;
-};
-void Init_hash_table(Hash_table &H, int n) {
-	H.H = new field[n];
-	H.n = n;
-}
 int Hash(int i, int key, int n) {
 	return (key + i) % n;
 }
-void Insert_hash_table(Hash_table H, int key, int n) {
-	int i=0, k = Hash(i, key, n);
-
-	while (i != n && !H.H[k].free) {
-		i++;
-		k = Hash(i, key, n);
-	}
-	if (i == n) cout << "ERROR";
-
-	H.H[k].key = key;
-	H.H[k].free = false;
-}
-int Search_hash_table(Hash_table H, int key, int n) {
+bool Insert_hash(Hash_field *&H, int key, int n) {
 	int i = 0, k = Hash(i, key, n);
-	while (i != n && H.H[k].deleted) {
-		if (H.H[k].key == key) return k;
+
+	while (i != n && H[k].state == 1) {
 		i++;
 		k = Hash(i, key, n);
 	}
-	if (i == n) cout << "ERROR";
-	else cout << "NO GIVEN VALUE";
+	if (i == n) return false;
 
+	H[k].key = key;
+	H[k].state = 1;
+	return true;
+}
+int Search_hash(Hash_field *&H, int key, int n) {
+	int i = 0, k = Hash(i, key, n);
+
+	while (i != n && H[k].state != 0) {
+		if (H[k].key == key) return k;
+		i++;
+		k = Hash(i, key, n);
+	}
 	return -1;
 }
-void Delete_hash_table(Hash_table H, int key, int n) {
-	int k = Search_hash_table(H, key, n);
+bool Delete_hash(Hash_field *&H, int key, int n) {
+	int k = Search_hash(H, key, n);
 	if (k != -1) {
-		H.H[k].key = -1;
-		H.H[k].free = true;
-		H.H[k].deleted = true;
+		H[k].state = 2;
+		return true;
 	}
+	return false;
+}
+void Print_hash_table(Hash_field *&H, int n) {
+	for (int i = 0; i < n; i++) {
+		cout << i << ":	";
+		if (H[i].state == 1) cout << H[i].key;
+		else cout << "NULL";
+		cout << endl;
+	}
+	cout << endl;
 }
 
 //Binary Search Trees
-struct BST_node {
+struct BST {
 	int key;
-	BST_node *right, *left, *parent;
+	BST *right, *left, *parent;
 };
-BST_node* Make_BST_node(int key) {
-	BST_node* x = new BST_node;
+BST* Init_BST(int key) {
+	BST* x = new BST;
 	x->key = key;
 	x->parent = x;
 	x->right = NULL;
 	x->left = NULL;
 	return x;
 }
-void BST_insert_recurr(BST_node* root, BST_node* x) {
-	if (root == NULL) root = x;
+void BST_insert(BST* &root, BST* x) {
+	if (root == NULL) { root = x; return; }
 
 	else {
 		if (x->key < root->key) {
 			if (root->left == NULL) { root->left = x; x->parent = root; }
-			else BST_insert_recurr(root->left, x);
+			else BST_insert(root->left, x);
 		}
 
 		else {
 			if (root->right == NULL) { root->right = x; x->parent = root; }
-			else BST_insert_recurr(root->right, x);
+			else BST_insert(root->right, x);
 		}
 	}
 }
-BST_node* BST_search(BST_node* root, int key) {
+BST* BST_search(BST* root, int key) {
 	if (root->key == key) return root;
 
 	else if (root->key < key) {
@@ -160,6 +164,31 @@ BST_node* BST_search(BST_node* root, int key) {
 		else return NULL;
 	}
 }
+void Print_BST(BST* root) {
+	if (root->left != NULL) Print_BST(root->left);
+	cout << root->key << " ";
+	if (root->right != NULL) Print_BST(root->right);
+}
+BST* BST_max(BST* root) {
+
+	if (root->right != NULL) return BST_max(root->right);
+	else return root;
+}
+BST* BST_min(BST* root) {
+	if (root->left != NULL) return BST_min(root->left);
+	else return root;
+}
+BST* BST_succ(BST* x) {
+	if (x->right != NULL) return BST_min(x->right);
+	else if (x = x->parent->left) return x->parent;
+	else return NULL;
+}
+BST* BST_pred(BST* x) {
+	if (x->left != NULL) return BST_max(x->left);
+	else if (x = x->parent->right) return x->parent;
+	else return NULL;
+}
+
 //to be contiuned...
 
 //Skip List
@@ -268,29 +297,27 @@ bool Delete_SL(SkipList* SL, int key) {
 }
 
 //Lasy zbiorow rozlacznych
-struct Node {
+struct node {
 	int key, rank;
-	Node *parent;
+	node *parent;
 };
-Node* Make_node(int key) {
-	Node *x;
+node* Make_set(int key) {
+	node *x = new node;
 	x->key = key;
 	x->parent = x;
 	x->rank = 0;
 	return x;
 }
-Node* Find_parent(Node* x) {
+node* Find_parent(node* x) {
 	if (x->parent == x) return x;
 	else x->parent = Find_parent(x->parent);
 }
-void Union(Node* x, Node* y) {
+void Union(node* x, node* y) {
 	x = Find_parent(x);
 	y = Find_parent(y);
-	if (x->rank <= y->rank) {
-		y->parent = x;
-		if (x->rank == y->rank) x->parent++;
-	}
-	else if (x->rank < y->rank) x->parent = y;
+	if (x->rank < y->rank) y->parent = x;
+	else if (x->rank == y->rank) { y->parent = x; x->rank++; }
+	else x->parent = y;
 }
 
 
@@ -306,12 +333,14 @@ void Union(Node* x, Node* y) {
 int main()
 {
 	srand(time(NULL));
-	SkipList *SL = Make_SL(16, N, K);
-	Print_detail(SL);
-	Delete_SL(SL, 2);
-	Delete_SL(SL, 4);
-	Delete_SL(SL, 0);
-	Print_detail(SL);
-    return 0;
+	BST* root = NULL;
+	for (int i = 0; i < N; i++) BST_insert(root, Init_BST(rand() % K));
+	Print_BST(root);
+	cout << endl;
+	cout << BST_max(root);
+	cout << endl;
+	system("pause");
+	
+	return 0;
 }
 
